@@ -10,16 +10,19 @@
     .bg-primary { background-color: var(--primary-color); }
     .hover\:bg-primary-dark:hover { background-color: var(--primary-dark); }
     .text-primary { color: var(--primary-color); }
+    .border-primary { border-color: var(--primary-color); }
     .card-hover { transition: all 0.2s ease; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08); }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.08); }
     #toastNotification { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translateY(100px); opacity: 0; }
     #toastNotification.show { transform: translateY(0); opacity: 1; }
+    @keyframes spin-custom { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .animate-spin-click { animation: spin-custom 0.8s ease-in-out; }
   </style>
 </head>
 <body class="bg-gray-50 font-sans antialiased text-gray-800 pb-16">
 
-  <!-- === HTML ORIGINAL (mantido 100%) === -->
-  <div id="loginScreen" class="absolute inset-0 bg-transparent flex items-center justify-center z-50 px-4 py-12">
+  <!-- SCREEN A: LOGIN -->
+  <div id="loginScreen" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50 px-4 py-12">
     <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-100">
       <div class="text-center mb-6">
         <h2 class="text-xl font-black tracking-tight text-gray-900">CONCILIADOR <span class="text-primary">UHUU</span></h2>
@@ -28,118 +31,646 @@
       <div class="space-y-4">
         <div>
           <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Usuário</label>
-          <input type="text" id="loginUser" placeholder="Ex: usuario.sobrenome" class="w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:border-primary">
+          <input type="text" id="loginUser" placeholder="Ex: usuario.sobrenome"
+            class="w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:border-primary">
         </div>
         <div>
           <label class="block text-[11px] font-bold text-gray-500 uppercase mb-1">Senha</label>
-          <input type="password" id="loginPassword" placeholder="••••••" class="w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:border-primary">
+          <input type="password" id="loginPassword" placeholder="••••••"
+            class="w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-sm focus:outline-none focus:border-primary">
         </div>
-        <button id="btnLogin" onclick="realizarLogin()" class="w-full bg-primary hover:bg-primary-dark text-white font-bold text-sm py-3 rounded-xl shadow-md transition">
+        <button id="btnLogin" onclick="realizarLogin()"
+          class="w-full bg-primary hover:bg-primary-dark text-white font-bold text-sm py-3 rounded-xl shadow-md transition">
           Entrar no Sistema
         </button>
       </div>
     </div>
   </div>
 
+  <!-- SCREEN B: APP -->
   <div id="app" class="hidden min-h-screen flex flex-col">
-    <!-- Todo o seu header, main, views (summaryView, contasView, eventosView, pedidosView, statusDetailsView, adminUsersView) permanecem EXATAMENTE iguais ao que você enviou. -->
 
-    <!-- ... Cole aqui todo o conteúdo do <div id="app"> que você me passou na última mensagem ... -->
+    <header class="bg-white shadow-sm border-b py-4">
+      <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        <h1 class="text-2xl font-black tracking-tight text-gray-900 cursor-pointer" onclick="showView('summary')">
+          CONCILIADOR <span class="text-primary">UHUU</span>
+        </h1>
+        <div class="flex items-center gap-4 text-xs">
+          <button id="adminMenuBtn" onclick="showView('adminUsers')"
+            class="hidden bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-1.5 px-3 rounded-lg transition">
+            ⚙️ Gerenciar Usuários
+          </button>
+          <button id="btnRealtimeRefresh" onclick="triggerRealtimeUpdate()" title="Atualizar"
+            class="bg-gray-50 hover:bg-gray-100 text-gray-600 p-2 rounded-xl border border-gray-200 transition flex items-center justify-center focus:outline-none active:scale-95 shadow-sm">
+            <svg id="refreshIconSvg" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+            </svg>
+          </button>
+          <div class="text-right text-gray-500 border-l pl-3 border-gray-200">
+            <p class="font-bold text-gray-900" id="userDisplay">Usuário: --</p>
+            <p class="text-[10px]">Dados de: <span id="lastUpdate">--:--</span></p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl mx-auto px-6 py-6 w-full">
+
+      <nav class="text-xs font-semibold text-gray-400 mb-6 tracking-wide uppercase">
+        <ol class="list-none p-0 inline-flex space-x-2 items-center">
+          <li><a href="#" onclick="showView('summary')" class="hover:text-primary">Resumo</a></li>
+          <li class="hidden" id="bc-contas-sep">/</li>
+          <li><a href="#" id="bc-contas" onclick="showView('contas')" class="hidden hover:text-primary">Contas</a></li>
+          <li class="hidden" id="bc-eventos-sep">/</li>
+          <li class="hidden text-gray-700" id="bc-eventos">Eventos</li>
+        </ol>
+      </nav>
+
+      <!-- VIEW 1: RESUMO -->
+      <div id="summaryView" class="view">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Resumo Geral</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+          <div class="bg-white border rounded-xl p-5 card-hover cursor-pointer" onclick="showView('contas')">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Pedidos Pendentes</p>
+            <p id="summaryPedidosPendentes" class="text-3xl font-black text-gray-900 mt-2">0</p>
+          </div>
+          <div class="bg-white border rounded-xl p-5 card-hover cursor-pointer" onclick="showView('contas')">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Valor Total Pendente</p>
+            <p id="summaryValorPendente" class="text-3xl font-black text-primary mt-2">R$ 0,00</p>
+          </div>
+          <div class="bg-white border rounded-xl p-5 card-hover cursor-pointer" onclick="showView('contas')">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Contas com Pendências</p>
+            <p id="summaryContasPendentes" class="text-3xl font-black text-gray-900 mt-2">0</p>
+          </div>
+        </div>
+        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Status dos meus envios</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          <div class="bg-white border rounded-xl p-5 card-hover cursor-pointer border-l-4 border-yellow-400" onclick="showStatusDetails('valida')">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Em Validação</p>
+            <div class="flex justify-between items-baseline mt-2">
+              <p id="summaryValidacaoQtd" class="text-2xl font-black text-gray-900">0 pedido(s)</p>
+              <p id="summaryValidacaoValor" class="text-lg font-bold text-yellow-600">R$ 0,00</p>
+            </div>
+          </div>
+          <div class="bg-white border rounded-xl p-5 card-hover cursor-pointer border-l-4 border-red-500" onclick="showStatusDetails('recusa')">
+            <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Recusados pelo Controle</p>
+            <div class="flex justify-between items-baseline mt-2">
+              <p id="summaryRecusadosQtd" class="text-2xl font-black text-gray-900">0 pedido(s)</p>
+              <p id="summaryRecusadosValor" class="text-lg font-bold text-red-600">R$ 0,00</p>
+            </div>
+          </div>
+        </div>
+        <button onclick="showView('contas')" class="bg-primary hover:bg-primary-dark text-white font-bold text-sm py-3 px-6 rounded-lg shadow-sm transition">
+          Ver Detalhes das Contas
+        </button>
+      </div>
+
+      <!-- VIEW 2: CONTAS -->
+      <div id="contasView" class="view hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-gray-900">Selecione uma Conta</h2>
+          <button onclick="showView('summary')" class="text-xs bg-white text-primary border border-primary hover:bg-pink-50 font-bold py-2 px-4 rounded transition">← Voltar</button>
+        </div>
+        <input type="text" id="searchContaInput" oninput="filterContas()" placeholder="Buscar conta..."
+          class="w-full px-3 py-2 text-sm bg-white border rounded-xl mb-4 focus:outline-none">
+        <div id="contasContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- VIEW 3: EVENTOS -->
+      <div id="eventosView" class="view hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-gray-900">Eventos de: <span id="currentContaTitle" class="text-primary"></span></h2>
+          <button onclick="showView('contas')" class="text-xs bg-white text-primary border border-primary hover:bg-pink-50 font-bold py-2 px-4 rounded transition">← Voltar</button>
+        </div>
+        <input type="text" id="searchEventoInput" oninput="filterEventos()" placeholder="Buscar evento..."
+          class="w-full px-3 py-2 text-sm bg-white border rounded-xl mb-4 focus:outline-none">
+        <div id="eventosContainer" class="space-y-3"></div>
+      </div>
+
+      <!-- VIEW 4: PEDIDOS -->
+      <div id="pedidosView" class="view hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-gray-900">Pedidos: <span id="currentEventoTitle" class="text-primary"></span></h2>
+          <button onclick="goBackToEventos()" class="text-xs bg-white text-primary border border-primary hover:bg-pink-50 font-bold py-2 px-4 rounded transition">← Voltar</button>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-white border rounded-xl p-5 shadow-sm">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+              <span class="text-xs font-bold text-gray-500 uppercase">Pendentes</span>
+              <label class="text-xs font-bold text-primary cursor-pointer">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" class="mr-2">Selecionar Todos
+              </label>
+            </div>
+            <div id="pedidosContainer" class="space-y-2 max-h-[500px] overflow-y-auto"></div>
+          </div>
+          <div class="bg-white border rounded-xl p-5 shadow-sm h-fit">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Enviar Validação</h3>
+            <p id="selectedCountText" class="text-sm font-black text-gray-900 mb-4">0 selecionados - R$ 0,00</p>
+            <div class="mb-4">
+              <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Comprovante <span class="text-primary font-black">*Obrigatório</span></label>
+              <input type="file" id="comprovanteFile" onchange="updateConciliacaoForm()" class="w-full text-xs text-gray-500">
+            </div>
+            <div class="mb-4">
+              <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Observação</label>
+              <textarea id="observacaoInput" rows="3" class="w-full p-2 bg-gray-50 border rounded-xl text-xs focus:outline-none resize-none"></textarea>
+            </div>
+            <button id="btnSalvar" onclick="submitConciliacao()"
+              class="w-full bg-gray-300 text-gray-500 font-bold text-sm py-3 rounded-lg shadow-sm transition cursor-not-allowed" disabled>
+              Selecione itens e anexe o comprovante
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 5: STATUS DETAILS -->
+      <div id="statusDetailsView" class="view hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-gray-900">Histórico: <span id="statusDetailsTitle" class="text-primary"></span></h2>
+          <button onclick="showView('summary')" class="text-xs bg-white text-primary border border-primary hover:bg-pink-50 font-bold py-2 px-4 rounded transition">← Voltar</button>
+        </div>
+        <div class="bg-white border rounded-xl p-5 shadow-sm">
+          <div id="statusDetailsContainer" class="space-y-3 max-h-[400px] overflow-y-auto pr-2 mb-6"></div>
+          <div id="ajustePainelBox" class="hidden border-t pt-5 mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-gray-50 p-4 border rounded-xl">
+              <div id="ajustePedidosListContainer" class="space-y-2 max-h-[250px] overflow-y-auto"></div>
+            </div>
+            <div class="p-4 border rounded-xl bg-white shadow-sm">
+              <span class="text-xs font-bold text-gray-500 uppercase block border-b pb-2 mb-3">Refazer Envio</span>
+              <p id="ajusteContadorTexto" class="text-xs font-bold text-gray-900 mb-3">0 selecionados</p>
+              <div class="mb-3">
+                <label class="block text-[10px] font-bold text-gray-700 uppercase mb-1">Novo Comprovante <span class="text-primary font-black">*Obrigatório</span></label>
+                <input type="file" id="ajusteFile" onchange="atualizarFormAjuste()" class="w-full text-xs">
+              </div>
+              <div class="mb-3">
+                <textarea id="ajusteObs" rows="2" class="w-full p-2 text-xs bg-gray-50 border rounded-lg focus:outline-none resize-none" placeholder="Informe o ajuste..."></textarea>
+              </div>
+              <button id="btnSalvarAjuste" onclick="executarSalvarAjuste()"
+                class="w-full bg-gray-300 text-gray-500 font-bold text-xs py-2 rounded shadow transition cursor-not-allowed" disabled>
+                Anexe o comprovante obrigatório
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 6: ADMIN -->
+      <div id="adminUsersView" class="view hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold text-gray-900">Painel Administrativo: <span class="text-primary">Criação de Usuários</span></h2>
+          <button onclick="showView('summary')" class="text-xs bg-white text-primary border border-primary hover:bg-pink-50 font-bold py-2 px-4 rounded transition">← Voltar</button>
+        </div>
+        <div class="bg-white border rounded-xl p-6 max-w-md shadow-sm">
+          <h3 class="text-sm font-bold text-gray-800 mb-4 uppercase">Adicionar Novo Acesso</h3>
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-gray-600 mb-1">Nome de Usuário (login)</label>
+              <input type="text" id="newUsername" placeholder="ex: fulano.silva" class="w-full p-2.5 bg-gray-50 border rounded-lg focus:outline-none">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 mb-1">Senha Inicial</label>
+              <input type="password" id="newPassword" placeholder="••••••" class="w-full p-2.5 bg-gray-50 border rounded-lg focus:outline-none">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 mb-1">E-mail Corporativo</label>
+              <input type="email" id="newEmail" placeholder="nome@uhuu.com" class="w-full p-2.5 bg-gray-50 border rounded-lg focus:outline-none">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 mb-1">Nível de Permissão</label>
+              <select id="newRole" class="w-full p-2.5 bg-gray-50 border rounded-lg focus:outline-none font-medium">
+                <option value="user">Usuário Padrão</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+            <button id="btnCreateUser" onclick="salvarNovoUsuario()"
+              class="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 rounded-lg transition mt-2">
+              Registrar Usuário na Planilha
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
 
     <div id="toastNotification" class="fixed bottom-5 right-5 z-50 text-xs font-bold px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-2 max-w-sm">
-      <span id="toastIcon">✅</span><span id="toastMessage"></span>
+      <span id="toastIcon">💡</span><span id="toastMessage">Mensagem</span>
     </div>
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbyg2LZTRma2NcqsrTfv2q1N7w-XkAOL6UY6NL7HpVRkSmOh5ENTnFfeiv_uZDBHNTsL/exec"; // ← ATUALIZE ESSA LINHA
+    // ─── URL do seu Apps Script Web App ──────────────────────────────────────────
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6SeVNhhnpKgWhmW0vvUS6y_TK5HuY-O0YpT3V84AkK8Cvk8KohfaTk7FKCGza8HYqWQ/exec';
 
+    // ─── Estado ───────────────────────────────────────────────────────────────────
     let session = { usuario: '', role: '', email: '' };
-    let state = { view: 'summary', contaSelecionada: '', eventoSelecionadoId: '', pedidosSelecionados: [], statusContexto: '', grupoIdsOrigem: [], grupoIdsSelecionados: [] };
+    let state = {
+      view: 'summary', contaSelecionada: '', eventoSelecionadoId: '', eventoSelecionadoNome: '',
+      contas: [], eventos: [], pedidos: [], pedidosSelecionados: [],
+      statusContexto: '', grupoIdsOrigem: [], grupoIdsSelecionados: []
+    };
 
-    async function callServer(action, body = {}) {
-      try {
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action, ...body })
-        });
-        return await res.json();
-      } catch (err) {
-        showNotification("Erro de conexão com o servidor", "error");
-        return { success: false, message: err.message };
-      }
+    // ─── Comunicação com o Apps Script via fetch ──────────────────────────────────
+    // GET — para ações simples de leitura
+    async function gasGet(action, params = {}) {
+      const qs = new URLSearchParams({ action, ...params }).toString();
+      const res = await fetch(`${APPS_SCRIPT_URL}?${qs}`, { redirect: 'follow' });
+      return res.json();
     }
 
-    function formatCurrency(v) { return 'R$ ' + parseFloat(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+    // POST — para ações que enviam dados (login, conciliar, etc.)
+    async function gasPost(action, body = {}) {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain' }, // Apps Script exige text/plain para doPost
+        body: JSON.stringify({ action, ...body })
+      });
+      return res.json();
+    }
+
+    // ─── Utilitários ─────────────────────────────────────────────────────────────
+    function formatCurrency(v) {
+      return 'R$ ' + parseFloat(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    }
 
     function showNotification(msg, type = 'success') {
       const toast = document.getElementById('toastNotification');
       document.getElementById('toastMessage').textContent = msg;
-      if (type === 'error') {
-        toast.className = "fixed bottom-5 right-5 z-50 bg-red-600 text-white text-xs font-bold px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-2";
-        document.getElementById('toastIcon').textContent = "⚠️";
-      } else {
-        toast.className = "fixed bottom-5 right-5 z-50 bg-gray-900 text-white text-xs font-bold px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-2";
-        document.getElementById('toastIcon').textContent = "✅";
-      }
+      toast.className = 'fixed bottom-5 right-5 z-50 text-xs font-bold px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-2 max-w-sm ' +
+        (type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-900 text-white');
+      document.getElementById('toastIcon').textContent = type === 'error' ? '⚠️' : '✅';
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 4000);
     }
 
-    // ==================== LOGIN ====================
+    function triggerRealtimeUpdate() {
+      const icon = document.getElementById('refreshIconSvg');
+      icon.classList.add('animate-spin-click');
+      setTimeout(() => icon.classList.remove('animate-spin-click'), 800);
+      showNotification('Buscando atualizações...', 'success');
+      loadSummary();
+    }
+
+    // ─── Login ────────────────────────────────────────────────────────────────────
     async function realizarLogin() {
       const u = document.getElementById('loginUser').value.trim();
       const s = document.getElementById('loginPassword').value.trim();
       const btn = document.getElementById('btnLogin');
-      if (!u || !s) return showNotification('Preencha todos os campos', 'error');
+      if (!u || !s) { showNotification('Preencha os campos para acessar.', 'error'); return; }
 
-      btn.disabled = true; btn.textContent = 'Autenticando...';
-
-      const res = await callServer('efetuarLogin', { usuario: u, senha: s });
-
-      if (res.success) {
-        session = res.user;
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        document.getElementById('userDisplay').textContent = `Usuário: ${session.usuario}`;
-        if (session.role === 'admin') document.getElementById('adminMenuBtn').classList.remove('hidden');
-        showView('summary');
-      } else {
-        showNotification(res.message, 'error');
+      btn.disabled = true;
+      btn.textContent = 'Autenticando...';
+      try {
+        const res = await gasPost('login', { usuario: u, senha: s });
+        if (res.success) {
+          session = res.user;
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('app').classList.remove('hidden');
+          document.getElementById('userDisplay').textContent = `Usuário: ${session.usuario}`;
+          if (session.role === 'admin') document.getElementById('adminMenuBtn').classList.remove('hidden');
+          showView('summary');
+        } else {
+          showNotification(res.message, 'error');
+        }
+      } catch (e) {
+        showNotification('Erro de conexão: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Entrar no Sistema';
       }
-      btn.disabled = false; btn.textContent = 'Entrar no Sistema';
     }
 
-    // ==================== FUNÇÕES CONVERTIDAS ====================
-    async function loadSummary() {
-      const res = await callServer('getResumoGeral');
-      document.getElementById('summaryPedidosPendentes').textContent = res.totalPedidosPendentes || 0;
-      document.getElementById('summaryValorPendente').textContent = formatCurrency(res.valorTotalPendente || 0);
-      document.getElementById('summaryContasPendentes').textContent = res.contasPendentes || 0;
-      document.getElementById('summaryValidacaoQtd').textContent = `${res.totalValidacao || 0} pedido(s)`;
-      document.getElementById('summaryValidacaoValor').textContent = formatCurrency(res.valorValidacao || 0);
-      document.getElementById('summaryRecusadosQtd').textContent = `${res.totalRecusados || 0} pedido(s)`;
-      document.getElementById('summaryRecusadosValor').textContent = formatCurrency(res.valorRecusados || 0);
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('loginPassword').addEventListener('keydown', e => {
+        if (e.key === 'Enter') realizarLogin();
+      });
+    });
+
+    // ─── Admin ────────────────────────────────────────────────────────────────────
+    async function salvarNovoUsuario() {
+      const nu = document.getElementById('newUsername').value.trim();
+      const ns = document.getElementById('newPassword').value.trim();
+      const ne = document.getElementById('newEmail').value.trim();
+      const nr = document.getElementById('newRole').value;
+      const btn = document.getElementById('btnCreateUser');
+      if (!nu || !ns || !ne) { showNotification('Preencha todos os campos.', 'error'); return; }
+
+      btn.disabled = true; btn.textContent = 'Salvando...';
+      try {
+        const res = await gasPost('criarUsuario', { currentUserRole: session.role, novoUsuario: nu, novaSenha: ns, novoEmail: ne, novoRole: nr });
+        showNotification(res.message, res.success ? 'success' : 'error');
+        if (res.success) {
+          document.getElementById('newUsername').value = '';
+          document.getElementById('newPassword').value = '';
+          document.getElementById('newEmail').value = '';
+        }
+      } catch (e) { showNotification('Erro: ' + e.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'Registrar Usuário na Planilha'; }
     }
 
-    async function showView(viewName, data = null) {
+    // ─── Navegação ────────────────────────────────────────────────────────────────
+    function showView(viewName, data = null) {
       state.view = viewName;
       document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-      document.getElementById(viewName + 'View').classList.remove('hidden');
+      document.getElementById(`${viewName}View`).classList.remove('hidden');
+
+      const hideBC = viewName === 'summary' || viewName === 'statusDetails' || viewName === 'adminUsers';
+      document.getElementById('bc-contas-sep').classList.toggle('hidden', hideBC);
+      document.getElementById('bc-contas').classList.toggle('hidden', hideBC);
+      document.getElementById('bc-eventos-sep').classList.toggle('hidden', viewName !== 'eventos' && viewName !== 'pedidos');
+      document.getElementById('bc-eventos').classList.toggle('hidden', viewName !== 'eventos' && viewName !== 'pedidos');
 
       if (viewName === 'summary') loadSummary();
       if (viewName === 'contas') loadContas();
-      if (viewName === 'eventos' && data) loadEventos(data.conta);
-      // Adicione as demais conforme necessário
+      if (viewName === 'eventos' && data) {
+        state.contaSelecionada = data.conta;
+        document.getElementById('currentContaTitle').textContent = data.conta;
+        loadEventos(data.conta);
+      }
+      if (viewName === 'pedidos' && data) {
+        state.eventoSelecionadoId = data.id;
+        state.eventoSelecionadoNome = data.nome;
+        document.getElementById('currentEventoTitle').textContent = `${data.id} - ${data.nome}`;
+        loadPedidos(data.id, state.contaSelecionada);
+      }
     }
 
-    // Continue convertendo loadContas, loadEventos, submitConciliacao, etc. da mesma forma.
-    // Se precisar de ajuda com alguma função específica, me avise.
+    function goBackToEventos() { showView('eventos', { conta: state.contaSelecionada }); }
 
-    window.onload = () => {
-      console.log("%cConciliador Uhuu carregado com sucesso!", "color:#EE3680;font-weight:bold");
-    };
+    // ─── Resumo ───────────────────────────────────────────────────────────────────
+    async function loadSummary() {
+      try {
+        const res = await gasGet('resumo');
+        document.getElementById('summaryPedidosPendentes').textContent = res.totalPedidosPendentes;
+        document.getElementById('summaryValorPendente').textContent = formatCurrency(res.valorTotalPendente);
+        document.getElementById('summaryContasPendentes').textContent = res.contasPendentes;
+        document.getElementById('summaryValidacaoQtd').textContent = `${res.totalValidacao} pedido(s)`;
+        document.getElementById('summaryValidacaoValor').textContent = formatCurrency(res.valorValidacao);
+        document.getElementById('summaryRecusadosQtd').textContent = `${res.totalRecusados} pedido(s)`;
+        document.getElementById('summaryRecusadosValor').textContent = formatCurrency(res.valorRecusados);
+        const now = new Date();
+        document.getElementById('lastUpdate').textContent =
+          String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+      } catch (e) { showNotification('Erro ao carregar resumo: ' + e.message, 'error'); }
+    }
+
+    // ─── Status details ───────────────────────────────────────────────────────────
+    async function showStatusDetails(statusTipo) {
+      state.statusContexto = statusTipo;
+      document.getElementById('ajustePainelBox').classList.add('hidden');
+      const container = document.getElementById('statusDetailsContainer');
+      document.getElementById('statusDetailsTitle').textContent = statusTipo === 'valida' ? 'Em Validação' : 'Recusados';
+      container.innerHTML = '<p class="text-xs text-gray-400 font-bold animate-pulse">Carregando listagem...</p>';
+      showView('statusDetails');
+
+      try {
+        const res = await gasGet('pedidosStatus', { status: statusTipo });
+        container.innerHTML = '';
+        if (!res || res.length === 0) {
+          container.innerHTML = '<p class="text-xs text-gray-400">Nenhum pedido localizado.</p>'; return;
+        }
+        res.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'p-4 border rounded-xl bg-white cursor-pointer hover:bg-pink-50/30 transition border-l-4 ' +
+            (statusTipo === 'valida' ? 'border-yellow-400' : 'border-red-500');
+          div.onclick = () => iniciarEdicaoFluxo(item.ComprovanteUrl, item.Observacao, item.ID);
+          const obsHtml = statusTipo === 'recusa'
+            ? `<div class="mt-3 p-2 bg-red-50 rounded-lg"><p class="text-[11px] font-bold text-red-700">MOTIVO DA RECUSA:</p><p class="text-xs text-red-900 mt-0.5">${item.Observacao}</p></div>`
+            : `<div class="mt-2 text-[11px] text-gray-400"><span class="font-bold">Minha Nota:</span> ${item.Observacao}</div>`;
+          div.innerHTML = `<div class="flex justify-between items-start"><div><span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono font-bold">#${item.ID}</span><h4 class="font-bold text-sm text-gray-900 mt-1">${item.Evento}</h4><p class="text-xs text-gray-400">${item.Conta} | <span class="text-primary font-bold">Clique para Ajustar 📝</span></p></div><div class="text-right"><span class="text-sm font-black text-gray-950">${formatCurrency(item.Valor)}</span></div></div>${obsHtml}`;
+          container.appendChild(div);
+        });
+      } catch (e) {
+        container.innerHTML = `<p class="text-xs text-red-500">Erro: ${e.message}</p>`;
+      }
+    }
+
+    async function iniciarEdicaoFluxo(comprovanteUrl, obsAtual, pedidoIdReferencia) {
+      const listContainer = document.getElementById('ajustePedidosListContainer');
+      listContainer.innerHTML = '<p class="text-xs text-gray-400 animate-pulse">Carregando lote...</p>';
+      document.getElementById('ajustePainelBox').classList.remove('hidden');
+      document.getElementById('ajusteObs').value = state.statusContexto === 'recusa' ? '' : obsAtual;
+      document.getElementById('ajusteFile').value = '';
+
+      try {
+        const pedidosLote = await gasPost('pedidosLote', {
+          comprovanteUrl, statusOrigem: state.statusContexto, pedidoIdReferencia
+        });
+        listContainer.innerHTML = '';
+        state.grupoIdsOrigem = pedidosLote.map(x => x.ID);
+        state.grupoIdsSelecionados = [...state.grupoIdsOrigem];
+        pedidosLote.forEach(p => {
+          const lbl = document.createElement('label');
+          lbl.className = 'flex items-center justify-between bg-white border p-2.5 rounded-lg cursor-pointer hover:bg-gray-100 transition text-xs';
+          lbl.innerHTML = `<div class="flex items-center space-x-2"><input type="checkbox" value="${p.ID}" checked onchange="toggleAjustePedido('${p.ID}')" class="rounded text-primary w-3.5 h-3.5"><span>#${p.ID} | ${p.Bilheteiro}</span></div><span class="font-bold">${formatCurrency(p.Valor)}</span>`;
+          listContainer.appendChild(lbl);
+        });
+        atualizarFormAjuste();
+      } catch (e) {
+        listContainer.innerHTML = `<p class="text-xs text-red-500">Erro: ${e.message}</p>`;
+      }
+    }
+
+    function toggleAjustePedido(id) {
+      if (state.grupoIdsSelecionados.includes(id)) {
+        state.grupoIdsSelecionados = state.grupoIdsSelecionados.filter(x => x !== id);
+      } else { state.grupoIdsSelecionados.push(id); }
+      atualizarFormAjuste();
+    }
+
+    function atualizarFormAjuste() {
+      const fileInp = document.getElementById('ajusteFile');
+      const btn = document.getElementById('btnSalvarAjuste');
+      const temArquivo = fileInp.files.length > 0;
+      const temItens = state.grupoIdsSelecionados.length > 0;
+      document.getElementById('ajusteContadorTexto').textContent = `${state.grupoIdsSelecionados.length} selecionado(s) para reenvio`;
+      if (temItens && temArquivo) {
+        btn.disabled = false;
+        btn.className = 'w-full bg-primary hover:bg-primary-dark text-white font-bold text-xs py-2 rounded shadow transition cursor-pointer';
+        btn.textContent = 'Salvar Alterações';
+      } else {
+        btn.disabled = true;
+        btn.className = 'w-full bg-gray-300 text-gray-500 font-bold text-xs py-2 rounded shadow transition cursor-not-allowed';
+        btn.textContent = !temItens ? 'Selecione ao menos 1 item' : 'Anexe o novo comprovante';
+      }
+    }
+
+    async function executarSalvarAjuste() {
+      const fileInp = document.getElementById('ajusteFile');
+      if (fileInp.files.length === 0) { showNotification('O anexo é obrigatório.', 'error'); return; }
+      const btn = document.getElementById('btnSalvarAjuste');
+      const obs = document.getElementById('ajusteObs').value;
+      btn.disabled = true; btn.textContent = 'Atualizando...';
+
+      const file = fileInp.files[0];
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const res = await gasPost('ajusteLote', {
+            pedidosAtuaisIds: state.grupoIdsSelecionados, todosIdsOrigem: state.grupoIdsOrigem,
+            comprovanteBase64: e.target.result, filename: file.name, observacao: obs
+          });
+          showNotification(res.message, res.success ? 'success' : 'error');
+          if (res.success) {
+            document.getElementById('ajusteFile').value = '';
+            document.getElementById('ajustePainelBox').classList.add('hidden');
+            showStatusDetails(state.statusContexto);
+          }
+        } catch (err) { showNotification('Erro: ' + err.message, 'error'); }
+        finally { btn.disabled = false; atualizarFormAjuste(); }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ─── Contas ───────────────────────────────────────────────────────────────────
+    async function loadContas() {
+      document.getElementById('contasContainer').innerHTML = '<p class="text-xs text-gray-400 animate-pulse">Carregando...</p>';
+      try {
+        state.contas = await gasGet('contas');
+        renderContas(state.contas);
+      } catch (e) {
+        document.getElementById('contasContainer').innerHTML = `<p class="text-xs text-red-500">Erro: ${e.message}</p>`;
+      }
+    }
+
+    function renderContas(lista) {
+      const c = document.getElementById('contasContainer'); c.innerHTML = '';
+      if (!lista || lista.length === 0) { c.innerHTML = '<p class="text-xs text-gray-400">Nenhuma pendência.</p>'; return; }
+      lista.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'bg-white border p-4 rounded-xl shadow-sm cursor-pointer card-hover border-l-4 border-primary flex justify-between items-center';
+        div.onclick = () => showView('eventos', { conta: item.Nome });
+        div.innerHTML = `<div><h3 class="font-bold text-sm text-gray-900">${item.Nome}</h3><p class="text-xs text-gray-400 mt-0.5">${item.TotalEventosPendentes} evento(s)</p></div><span class="text-sm font-black text-primary">${formatCurrency(item.TotalValorPendente)}</span>`;
+        c.appendChild(div);
+      });
+    }
+
+    function filterContas() {
+      const q = document.getElementById('searchContaInput').value.toLowerCase();
+      renderContas(state.contas.filter(x => x.Nome.toLowerCase().includes(q)));
+    }
+
+    // ─── Eventos ──────────────────────────────────────────────────────────────────
+    async function loadEventos(conta) {
+      document.getElementById('eventosContainer').innerHTML = '<p class="text-xs text-gray-400 animate-pulse">Carregando...</p>';
+      try {
+        state.eventos = await gasGet('eventos', { conta });
+        renderEventos(state.eventos);
+      } catch (e) {
+        document.getElementById('eventosContainer').innerHTML = `<p class="text-xs text-red-500">Erro: ${e.message}</p>`;
+      }
+    }
+
+    function renderEventos(lista) {
+      const c = document.getElementById('eventosContainer'); c.innerHTML = '';
+      if (!lista || lista.length === 0) { c.innerHTML = '<p class="text-xs text-gray-400">Nenhum evento.</p>'; return; }
+      lista.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'bg-white border p-4 rounded-xl shadow-sm cursor-pointer card-hover flex justify-between items-center';
+        div.onclick = () => showView('pedidos', { id: item.ID, nome: item.Nome });
+        div.innerHTML = `<div><span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono font-bold">${item.ID}</span><h3 class="font-bold text-xs text-gray-900 mt-1">${item.Nome}</h3><p class="text-[11px] text-gray-400">Data: ${item.Data} | ${item.TotalPedidosPendentes} pedidos</p></div><span class="text-xs font-black text-gray-950">${formatCurrency(item.TotalValorPendente)}</span>`;
+        c.appendChild(div);
+      });
+    }
+
+    function filterEventos() {
+      const q = document.getElementById('searchEventoInput').value.trim().toLowerCase();
+      renderEventos(state.eventos.filter(x =>
+        String(x.Nome || '').toLowerCase().includes(q) || String(x.ID || '').includes(q)
+      ));
+    }
+
+    // ─── Pedidos ─────────────────────────────────────────────────────────────────
+    async function loadPedidos(eventoId, conta) {
+      document.getElementById('pedidosContainer').innerHTML = '<p class="text-xs text-gray-400 animate-pulse">Buscando...</p>';
+      state.pedidosSelecionados = [];
+      updateConciliacaoForm();
+      document.getElementById('selectAllCheckbox').checked = false;
+      document.getElementById('comprovanteFile').value = '';
+      try {
+        state.pedidos = await gasGet('pedidos', { eventoId, conta });
+        renderPedidos();
+      } catch (e) {
+        document.getElementById('pedidosContainer').innerHTML = `<p class="text-xs text-red-500">Erro: ${e.message}</p>`;
+      }
+    }
+
+    function renderPedidos() {
+      const c = document.getElementById('pedidosContainer'); c.innerHTML = '';
+      if (!state.pedidos || state.pedidos.length === 0) {
+        c.innerHTML = '<p class="text-xs text-gray-400">Todos processados!</p>'; return;
+      }
+      state.pedidos.forEach(p => {
+        const div = document.createElement('label');
+        div.className = 'flex items-center justify-between bg-gray-50 border p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition';
+        const isChecked = state.pedidosSelecionados.includes(p.ID) ? 'checked' : '';
+        div.innerHTML = `<div class="flex items-center space-x-3"><input type="checkbox" value="${p.ID}" ${isChecked} onchange="togglePedido('${p.ID}')" class="rounded text-primary w-4 h-4"><div><p class="text-xs font-mono font-bold text-gray-900">#${p.ID}</p><p class="text-[11px] text-gray-400">Bilheteiro: ${p.Bilheteiro}</p></div></div><span class="text-xs font-bold text-gray-900">${formatCurrency(p.Valor)}</span>`;
+        c.appendChild(div);
+      });
+    }
+
+    function togglePedido(id) {
+      if (state.pedidosSelecionados.includes(id)) {
+        state.pedidosSelecionados = state.pedidosSelecionados.filter(x => x !== id);
+      } else { state.pedidosSelecionados.push(id); }
+      updateConciliacaoForm();
+    }
+
+    function toggleSelectAll() {
+      state.pedidosSelecionados = document.getElementById('selectAllCheckbox').checked
+        ? state.pedidos.map(x => x.ID) : [];
+      renderPedidos(); updateConciliacaoForm();
+    }
+
+    function updateConciliacaoForm() {
+      const count = state.pedidosSelecionados.length; let soma = 0;
+      state.pedidos.forEach(p => { if (state.pedidosSelecionados.includes(p.ID)) soma += p.Valor; });
+      document.getElementById('selectedCountText').textContent = `${count} selecionado(s) - ${formatCurrency(soma)}`;
+      const fileInp = document.getElementById('comprovanteFile');
+      const btn = document.getElementById('btnSalvar');
+      const temArquivo = fileInp.files.length > 0;
+      if (count > 0 && temArquivo) {
+        btn.disabled = false;
+        btn.className = 'w-full bg-primary hover:bg-primary-dark text-white font-bold text-sm py-3 rounded-lg shadow-sm transition cursor-pointer';
+        btn.textContent = 'Salvar em Validação';
+      } else {
+        btn.disabled = true;
+        btn.className = 'w-full bg-gray-300 text-gray-500 font-bold text-sm py-3 rounded-lg shadow-sm transition cursor-not-allowed';
+        btn.textContent = count === 0 ? 'Selecione ao menos 1 item' : 'Anexe o arquivo de comprovante';
+      }
+    }
+
+    async function submitConciliacao() {
+      const fileInput = document.getElementById('comprovanteFile');
+      if (fileInput.files.length === 0) { showNotification('O arquivo de comprovante é obrigatório.', 'error'); return; }
+      const btn = document.getElementById('btnSalvar');
+      const obs = document.getElementById('observacaoInput').value;
+      btn.disabled = true; btn.textContent = 'Enviando...';
+
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const res = await gasPost('conciliar', {
+            pedidoIds: state.pedidosSelecionados,
+            comprovanteBase64: e.target.result,
+            filename: file.name, observacao: obs
+          });
+          if (res.success) {
+            showNotification(res.message, 'success');
+            document.getElementById('comprovanteFile').value = '';
+            document.getElementById('observacaoInput').value = '';
+            loadPedidos(state.eventoSelecionadoId, state.contaSelecionada);
+          } else {
+            showNotification(res.message, 'error');
+            btn.disabled = false; updateConciliacaoForm();
+          }
+        } catch (err) {
+          showNotification('Erro: ' + err.message, 'error');
+          btn.disabled = false; updateConciliacaoForm();
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   </script>
 </body>
 </html>
